@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Self-Checkout</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --card: #ffffff;
+      --text: #212529;
+      --muted: #6c757d;
+      --border: #dee2e6;
+      --primary: #007bff;
+      --danger: #dc3545;
+      --success: #28a745;
+      --shadow: rgba(0, 0, 0, 0.1);
+      --shadow-hover: rgba(0, 0, 0, 0.15);
+      --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --radius: 12px;
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    [data-theme="dark"] {
+      --bg: #121212;
+      --card: #1e1e1e;
+      --text: #ffffff;
+      --muted: #b0b0b0;
+      --border: #333333;
+      --shadow: rgba(255, 255, 255, 0.1);
+      --shadow-hover: rgba(255, 255, 255, 0.15);
+      --gradient: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0; padding: 0;
+      background: var(--bg); color: var(--text);
+      transition: var(--transition);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 20px 0; border-bottom: 1px solid var(--border);
+      margin-bottom: 30px;
+      animation: slideDown 0.6s ease-out;
+    }
+    @keyframes slideDown {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .header h1 {
+      margin: 0; font-weight: 700; font-size: 2rem;
+      background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .search { flex: 1; margin: 0 30px; max-width: 500px; }
+    .search input {
+      width: 100%; padding: 12px 16px; border: 2px solid var(--border);
+      background: var(--card); color: var(--text); border-radius: 25px;
+      font-size: 16px; transition: var(--transition);
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+    .search input:focus {
+      outline: none; border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1), 0 4px 20px var(--shadow-hover);
+      transform: scale(1.02);
+    }
+    .btn {
+      padding: 12px 20px; border: none; border-radius: 25px; cursor: pointer;
+      font-size: 14px; font-weight: 500; transition: var(--transition);
+      display: inline-flex; align-items: center; gap: 8px;
+      position: relative; overflow: hidden;
+    }
+    .btn::before {
+      content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s;
+    }
+    .btn:hover::before { left: 100%; }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px var(--shadow-hover); }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-ghost { background: transparent; color: var(--text); border: 2px solid var(--border); }
+    .btn-cart { background: var(--success); color: white; }
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 30px; margin: 30px 0;
+    }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden; transition: var(--transition); box-shadow: 0 2px 10px var(--shadow);
+      position: relative;
+    }
+    .card:hover {
+      transform: translateY(-8px) scale(1.02); box-shadow: 0 12px 40px var(--shadow-hover);
+    }
+    .card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--gradient); opacity: 0; transition: opacity 0.3s;
+      border-radius: var(--radius);
+    }
+    .card:hover::before { opacity: 0.05; }
+    .thumb {
+      position: relative; overflow: hidden;
+      img {
+        width: 100%; height: 220px; object-fit: cover; transition: var(--transition);
+      }
+    }
+    .card:hover .thumb img { transform: scale(1.1); }
+    .card-body { padding: 20px; position: relative; z-index: 1; }
+    .title { font-weight: 600; margin-bottom: 8px; font-size: 18px; }
+    .muted { color: var(--muted); font-size: 14px; margin-bottom: 15px; }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
+    .price {
+      font-size: 20px; font-weight: 700; color: var(--primary);
+      text-shadow: 0 2px 4px rgba(0,123,255,0.3);
+    }
+    .sidebar {
+      position: fixed; top: 0; right: -450px; width: 450px; height: 100vh;
+      background: var(--card); border-left: 1px solid var(--border);
+      transition: var(--transition); z-index: 1000; padding: 30px; overflow-y: auto;
+      box-shadow: -10px 0 30px var(--shadow);
+    }
+    .sidebar.open { right: 0; }
+    .sidebar h2 { margin-top: 0; font-weight: 700; }
+    .cart-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 15px 0; border-bottom: 1px solid var(--border);
+      transition: var(--transition);
+    }
+    .cart-item:hover { background: rgba(0,123,255,0.05); border-radius: 8px; padding: 15px; margin: 0 -15px; }
+    .cart-item div:first-child { flex: 1; }
+    .qty {
+      display: flex; align-items: center; gap: 10px; margin: 0 15px;
+      button {
+        padding: 8px 12px; border-radius: 50%; width: 36px; height: 36px;
+        border: 2px solid var(--border); background: var(--card); color: var(--text);
+        transition: var(--transition); cursor: pointer;
+      }
+      button:hover { background: var(--primary); color: white; transform: scale(1.1); }
+    }
+    .steps {
+      display: flex; justify-content: center; margin: 30px 0;
+      position: relative;
+    }
+    .steps::before {
+      content: ''; position: absolute; top: 50%; left: 0; right: 0;
+      height: 3px; background: var(--border); z-index: 1;
+      border-radius: 2px;
+    }
+    .step {
+      padding: 12px 24px; background: var(--card); border: 2px solid var(--border);
+      border-radius: 50px; margin: 0 10px; position: relative; z-index: 2;
+      font-weight: 500; transition: var(--transition);
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+    .step.active {
+      background: var(--gradient); color: white; border-color: transparent;
+      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+      transform: scale(1.05);
+    }
+    .section {
+      display: none; max-width: 600px; margin: 0 auto;
+      animation: fadeIn 0.5s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .section:not(.hidden) { display: block; }
+    .section h2 {
+      text-align: center; margin-bottom: 30px; font-weight: 700;
+      background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .form-group { margin: 20px 0; }
+    .form-group label { display: block; margin-bottom: 8px; font-weight: 500; }
+    .form-group input {
+      width: 100%; padding: 12px 16px; background: var(--card); color: var(--text);
+      border: 2px solid var(--border); border-radius: 8px; font-size: 16px;
+      transition: var(--transition); box-shadow: 0 2px 10px var(--shadow);
+    }
+    .form-group input:focus {
+      outline: none; border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1), 0 4px 20px var(--shadow-hover);
+    }
+    .summary {
+      background: var(--card); border-radius: var(--radius); padding: 20px; margin: 30px 0;
+      box-shadow: 0 4px 20px var(--shadow);
+      border: 1px solid var(--border);
+    }
+    .summary div {
+      display: flex; justify-content: space-between; margin: 8px 0; font-size: 16px;
+      transition: var(--transition);
+    }
+    .summary div:hover { background: rgba(0,123,255,0.05); padding: 4px 8px; border-radius: 4px; margin: 4px -8px; }
+    .summary div:last-child {
+      font-weight: 700; font-size: 18px; border-top: 2px solid var(--border); padding-top: 15px;
+      margin-top: 15px; color: var(--primary);
+    }
+    .modal {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
+      z-index: 1001; backdrop-filter: blur(8px); transition: var(--transition);
+    }
+    .modal.hidden { display: none; }
+    .modal-content {
+      background: var(--card); padding: 30px; border-radius: var(--radius); width: 90%; max-width: 400px;
+      box-shadow: 0 20px 60px var(--shadow); transform: scale(0.9); transition: var(--transition);
+    }
+    .modal:not(.hidden) .modal-content { transform: scale(1); }
+    .toast {
+      position: fixed; bottom: 30px; right: 30px; background: var(--success);
+      color: white; padding: 15px 25px; border-radius: 50px; opacity: 0; transition: var(--transition);
+      box-shadow: 0 4px 20px var(--shadow); z-index: 1002;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast:not(.show) { transform: translateY(20px); }
+    .floating-btn {
+      position: fixed; bottom: 30px; left: 30px; width: 60px; height: 60px;
+      border-radius: 50%; background: var(--gradient); color: white;
+      border: none; cursor: pointer; box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; transition: var(--transition); z-index: 100;
+    }
+    .floating-btn:hover {
+      transform: scale(1.1) rotate(5deg); box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+    }
+    .loading {
+      display: inline-block; width: 20px; height: 20px;
+      border: 3px solid rgba(255,255,255,0.3); border-radius: 50%;
+      border-top-color: white; animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    @media (max-width: 768px) {
+      .container { padding: 15px; }
+      .header { flex-direction: column; gap: 15px; }
+      .search { margin: 0; max-width: none; }
+      .sidebar { width: 100%; right: -100%; }
+      .grid { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+      .modal-content { width: 95%; }
+    }
+  </style>
+</head>
+<body>
+  <button class="floating-btn pulse" id="toggleTheme"><i class="fa fa-moon"></i></button>
+
+  <div class="container">
+    <div class="header">
+      <h1><i class="fa fa-shopping-bag"></i> Smart Self-Checkout</h1>
+      <div class="search">
+        <input type="text" id="searchInput" placeholder="Search products...">
+      </div>
+      <div>
+        <button class="btn btn-ghost" id="openCart"><i class="fa fa-shopping-cart"></i> Cart</button>
+        <button class="btn btn-ghost" id="openScanner"><i class="fa fa-qrcode"></i> Scan</button>
+      </div>
+    </div>
+
+    <div class="steps">
+      <div class="step active" id="stepCart"><i class="fa fa-shopping-cart"></i> Cart</div>
+      <div class="step" id="stepPayment"><i class="fa fa-credit-card"></i> Payment</div>
+      <div class="step" id="stepReceipt"><i class="fa fa-receipt"></i> Receipt</div>
+    </div>
+
+    <div id="productGrid" class="grid"></div>
+  </div>
+
+  <div id="cartSidebar" class="sidebar">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h2><i class="fa fa-shopping-cart"></i> Your Cart</h2>
+      <button class="btn btn-ghost" id="closeCart"><i class="fa fa-times"></i></button>
+    </div>
+    <div id="cartItems"></div>
+    <div class="form-group" style="margin-top: 30px;">
+      <label for="couponInput">Coupon Code</label>
+      <input type="text" id="couponInput" placeholder="e.g., SAVE10, INDORE5">
+    </div>
+    <div style="margin-top: 20px; text-align: right; font-size: 18px; font-weight: 700;">
+      <strong>Total: <span id="cartTotal"></span></strong>
+    </div>
+    <button class="btn btn-primary" id="checkoutBtn" style="width: 100%; margin-top: 20px;"><i class="fa fa-arrow-right"></i> Proceed to Payment</button>
+    <button class="btn btn-ghost" id="resetCart" style="width: 100%; margin-top: 10px;"><i class="fa fa-trash"></i> Reset Cart</button>
+  </div>
+
+  <div id="paymentSection" class="section hidden">
+    <h2><i class="fa fa-credit-card"></i> Payment Details</h2>
+    <div class="form-group">
+      <label for="nameInput">Full Name</label>
+      <input type="text" id="nameInput" placeholder="Enter your full name">
+    </div>
+    <div class="form-group">
+      <label for="emailInput">Email Address</label>
+      <input type="email" id="emailInput" placeholder="Enter your email">
+    </div>
+    <div class="summary">
+      <div><span>Subtotal:</span> <span id="subtotalText"></span></div>
+      <div><span>Discount:</span> <span id="discountText"></span></div>
+      <div><strong>Payable Amount:</strong> <span id="payableText"></span></div>
+    </div>
+    <button class="btn btn-primary" id="payBtn" style="width: 100%;"><i class="fa fa-lock"></i> Pay Now</button>
+    <button class="btn btn-ghost" id="backToCartBtn" style="width: 100%; margin-top: 10px;"><i class="fa fa-arrow-left"></i> Back to Cart</button>
+  </div>
+
+  <div id="receiptSection" class="section hidden">
+    <h2><i class="fa fa-check-circle"></i> Receipt</h2>
+    <p style="text-align: center; font-size: 18px; margin-bottom: 30px;">Thank you for your purchase! Your order has been processed successfully.</p>
+    <div style="text-align: center; margin-bottom: 30px;">
+      <div id="qrcode" style="display: inline-block;"></div>
+    </div>
+    <button class="btn btn-primary" id="newOrderBtn" style="width: 100%;"><i class="fa fa-plus"></i> Start New Order</button>
+  </div>
+
+  <div id="scannerModal" class="modal hidden">
+    <div class="modal-content">
+      <h3><i class="fa fa-qrcode"></i> Scan Product</h3>
+      <div class="form-group">
+        <input type="text" id="scannerInput" placeholder="Enter product code or name">
+      </div>
+      <button class="btn btn-primary" id="scanBtn" style="width: 100%;"><i class="fa fa-search"></i> Scan</button>
+      <button class="btn btn-ghost" id="closeScanner" style="width: 100%; margin-top: 10px;"><i class="fa fa-times"></i> Close</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
