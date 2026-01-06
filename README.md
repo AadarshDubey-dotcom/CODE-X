@@ -23,3 +23,11 @@ Checkout & payment screen
 Digital receipt with QR code
 
 Smooth animations & micro-interactions
+
+3)Tech Stack
+
+HTML
+
+CSS
+
+Vanilla JavaScript
